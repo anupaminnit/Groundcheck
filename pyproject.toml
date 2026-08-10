@@ -1,0 +1,81 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "groundcheck-ai"
+version = "0.1.0"
+description = "Verify RAG answers against retrieved evidence and apply a policy to unsupported claims."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [{ name = "anupaminnit" }]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Typing :: Typed",
+]
+dependencies = [
+    "pydantic>=2.0,<3",
+    "pydantic-settings>=2.0",
+    "httpx>=0.27",
+    "openai>=1.0",
+    "anthropic>=0.34",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.24", "ruff>=0.5", "mypy>=1.10"]
+local = ["transformers>=4.40", "torch>=2.2"]
+langchain = ["langchain-core>=0.2"]
+fastapi = ["fastapi>=0.110"]
+litellm = ["litellm>=1.40"]
+
+[project.scripts]
+groundcheck = "groundcheck.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/anupaminnit/Groundcheck"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/groundcheck"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_unused_configs = true
+
+# Optional extras (torch/transformers, litellm, langchain_core) — mypy must pass
+# without them installed, so core stays type-checkable without pulling in
+# optional deps. (fastapi isn't listed: integrations/fastapi.py never imports it.)
+[[tool.mypy.overrides]]
+module = ["torch.*", "transformers.*", "litellm.*", "langchain_core.*"]
+ignore_missing_imports = true
+
+# integrations/langchain.py subclasses AsyncCallbackHandler with a `# type:
+# ignore[misc]` needed only when langchain_core isn't installed (CI's bare
+# `[dev]` install). Locally, with the [langchain] extra installed, that same
+# ignore is reported as unused — suppress just that warning for this file
+# rather than weakening strict mode project-wide.
+[[tool.mypy.overrides]]
+module = "groundcheck.integrations.langchain"
+warn_unused_ignores = false
+
+[tool.pytest.ini_options]
+asyncio_mode = "strict"
+markers = [
+    "integration: requires real API keys/models; skipped by default",
+]
+addopts = "-m 'not integration'"
