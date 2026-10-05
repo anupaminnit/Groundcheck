@@ -65,9 +65,11 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         "evidence_file", help="Path to a JSON file: a list of strings or {id, text} objects."
     )
     check.add_argument("--question", default="", help="The question the answer responds to.")
-    check.add_argument("--verifier", default="llm", choices=["llm"])
+    check.add_argument("--verifier", default="llm", choices=["llm", "local", "hybrid"])
     check.add_argument("--policy", default="log", choices=["log", "annotate", "redact", "block"])
-    check.add_argument("--provider", default=None, choices=["azure", "openai", "anthropic"])
+    check.add_argument(
+        "--provider", default=None, choices=["azure", "openai", "anthropic", "litellm"]
+    )
     check.add_argument("--model", default=None)
     check.add_argument("--base-url", dest="base_url", default=None)
     check.add_argument("--threshold", type=float, default=0.7)
