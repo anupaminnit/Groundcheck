@@ -8,12 +8,16 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 from fakes import FakeProvider
+from groundcheck import cli
 from groundcheck.cli import main
+from groundcheck.config import GuardConfig
 from groundcheck.core.guard import Guard
+from groundcheck.core.schemas import Action, GuardReport, TokenUsage
 
 
 def _extractor_response() -> str:
@@ -85,6 +89,59 @@ def test_cli_check_json_output(tmp_path: Path, capsys: pytest.CaptureFixture[str
     payload = json.loads(capsys.readouterr().out)
     assert payload["action"] == "pass"
     assert payload["grounded_score"] == 1.0
+
+
+class _CapturingGuard:
+    """Stands in for ``Guard`` so no NLI model or provider is ever loaded."""
+
+    configs: list[GuardConfig] = []
+
+    def __init__(self, config: GuardConfig) -> None:
+        self.configs.append(config)
+
+    def check(self, answer: str, evidence: list[Any], question: str = "") -> GuardReport:
+        return GuardReport(
+            grounded_score=1.0,
+            action=Action.PASS,
+            safe_answer=answer,
+            claims=[],
+            verifier="stub",
+            latency_ms=0,
+            tokens=TokenUsage(),
+        )
+
+
+@pytest.mark.parametrize("verifier", ["local", "hybrid"])
+def test_cli_accepts_local_and_hybrid_verifier(
+    verifier: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    answer_path, evidence_path = _write_inputs(tmp_path)
+    _CapturingGuard.configs = []
+    monkeypatch.setattr(cli, "Guard", _CapturingGuard)
+
+    exit_code = main(["check", answer_path, evidence_path, "--verifier", verifier])
+
+    assert exit_code == 0
+    assert _CapturingGuard.configs[0].verifier == verifier
+    assert _CapturingGuard.configs[0].provider is None
+
+
+def test_cli_accepts_litellm_provider(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    answer_path, evidence_path = _write_inputs(tmp_path)
+    _CapturingGuard.configs = []
+    monkeypatch.setattr(cli, "Guard", _CapturingGuard)
+
+    main(["check", answer_path, evidence_path, "--provider", "litellm", "--model", "ollama/x"])
+
+    assert _CapturingGuard.configs[0].provider == "litellm"
+    assert _CapturingGuard.configs[0].model == "ollama/x"
+
+
+def test_cli_rejects_unknown_verifier(tmp_path: Path) -> None:
+    answer_path, evidence_path = _write_inputs(tmp_path)
+
+    with pytest.raises(SystemExit):
+        main(["check", answer_path, evidence_path, "--verifier", "bogus"])
 
 
 def test_cli_check_reads_dict_evidence(tmp_path: Path) -> None:
