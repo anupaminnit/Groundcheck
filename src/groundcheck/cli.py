@@ -15,7 +15,10 @@ from typing import Any
 
 from groundcheck.config import GuardConfig
 from groundcheck.core.guard import Guard
-from groundcheck.core.schemas import GuardReport
+from groundcheck.core.schemas import Action, GuardReport
+
+EXIT_BELOW_THRESHOLD = 1
+EXIT_ERROR = 2
 
 
 def main(argv: Sequence[str] | None = None, *, guard: Guard | None = None) -> int:
@@ -28,13 +31,18 @@ def main(argv: Sequence[str] | None = None, *, guard: Guard | None = None) -> in
             tests use to inject a ``Guard`` backed by a fake provider.
 
     Returns:
-        Process exit code: ``1`` if ``grounded_score`` is below ``--threshold``,
+        Process exit code: ``2`` for unreadable/invalid inputs or a fail-open
+        ``ERROR`` report, ``1`` if ``grounded_score`` is below ``--threshold``,
         ``0`` otherwise.
     """
     args = _parse_args(argv)
 
-    answer = _read_text(args.answer_file)
-    evidence = _load_evidence(args.evidence_file)
+    try:
+        answer = _read_text(args.answer_file)
+        evidence = _load_evidence(args.evidence_file)
+    except (OSError, UnicodeDecodeError, ValueError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return EXIT_ERROR
 
     active_guard = guard or Guard(
         config=GuardConfig(
@@ -50,7 +58,11 @@ def main(argv: Sequence[str] | None = None, *, guard: Guard | None = None) -> in
     report = active_guard.check(answer, evidence, question=args.question)
     _print_report(report, fmt=args.format)
 
-    return 1 if report.grounded_score < args.threshold else 0
+    if report.action == Action.ERROR:
+        print(f"error: {report.error}", file=sys.stderr)
+        return EXIT_ERROR
+
+    return EXIT_BELOW_THRESHOLD if report.grounded_score < args.threshold else 0
 
 
 def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
