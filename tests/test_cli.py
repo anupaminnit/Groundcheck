@@ -197,7 +197,10 @@ def test_cli_error_report_exits_2_not_1(
                 error="provider down",
             )
 
-    exit_code = main(["check", answer_path, evidence_path], guard=_ErrorGuard())  # type: ignore[arg-type]  # noqa: E501
+    exit_code = main(
+        ["check", answer_path, evidence_path],
+        guard=_ErrorGuard(),  # type: ignore[arg-type]
+    )
 
     assert exit_code == 2
     assert "provider down" in capsys.readouterr().err

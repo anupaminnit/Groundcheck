@@ -69,7 +69,18 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog="groundcheck")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    check = subparsers.add_parser("check", help="Verify an answer against its evidence.")
+    check = subparsers.add_parser(
+        "check",
+        help="Verify an answer against its evidence.",
+        description="Verify an answer against its evidence.",
+        epilog=(
+            "exit codes:\n"
+            "  0  grounded\n"
+            "  1  score below --threshold\n"
+            "  2  input file or provider error"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     check.add_argument(
         "answer_file", help="Path to a text file containing the answer ('-' for stdin)."
     )
