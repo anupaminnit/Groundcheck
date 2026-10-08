@@ -144,6 +144,68 @@ def test_cli_rejects_unknown_verifier(tmp_path: Path) -> None:
         main(["check", answer_path, evidence_path, "--verifier", "bogus"])
 
 
+def test_cli_missing_answer_file_exits_2(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _, evidence_path = _write_inputs(tmp_path)
+
+    exit_code = main(["check", str(tmp_path / "nope.txt"), evidence_path])
+
+    assert exit_code == 2
+    assert capsys.readouterr().err.startswith("error:")
+
+
+def test_cli_missing_evidence_file_exits_2(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    answer_path, _ = _write_inputs(tmp_path)
+
+    exit_code = main(["check", answer_path, str(tmp_path / "nope.json")])
+
+    assert exit_code == 2
+    assert capsys.readouterr().err.startswith("error:")
+
+
+def test_cli_invalid_evidence_json_exits_2(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    answer_path, _ = _write_inputs(tmp_path)
+    bad_path = tmp_path / "bad.json"
+    bad_path.write_text("{not json", encoding="utf-8")
+
+    exit_code = main(["check", answer_path, str(bad_path)])
+
+    assert exit_code == 2
+    assert capsys.readouterr().err.startswith("error:")
+
+
+def test_cli_error_report_exits_2_not_1(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    answer_path, evidence_path = _write_inputs(tmp_path)
+
+    class _ErrorGuard:
+        def check(self, answer: str, evidence: list[Any], question: str = "") -> GuardReport:
+            return GuardReport(
+                grounded_score=-1.0,
+                action=Action.ERROR,
+                safe_answer=answer,
+                claims=[],
+                verifier="stub",
+                latency_ms=0,
+                tokens=TokenUsage(),
+                error="provider down",
+            )
+
+    exit_code = main(
+        ["check", answer_path, evidence_path],
+        guard=_ErrorGuard(),  # type: ignore[arg-type]
+    )
+
+    assert exit_code == 2
+    assert "provider down" in capsys.readouterr().err
+
+
 def test_cli_check_reads_dict_evidence(tmp_path: Path) -> None:
     answer_path = tmp_path / "answer.txt"
     answer_path.write_text("Paris is the capital of France.", encoding="utf-8")
